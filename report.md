@@ -31,7 +31,7 @@ S = HSV[:,:,1]
 V = HSV[:,:,2]
 ```
 
-*  Reason:
+    *  Reason:
 In my initial solution, I use grayscale image. However, it works very bad in the challenge part. I found that the grayscale image can not provide enough gradient information to distinguish the lane from background in this scenario. Especially after gaussian blur. So I decided to switch to HSV space.
 
 * The intensity of the grayscale image and the V channel image were plotted along these three lines to show the difference.
