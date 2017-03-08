@@ -35,7 +35,7 @@ V = HSV[:,:,2]
 In my initial solution, I use grayscale image. However, it works very bad in the challenge part. I found that the grayscale image can not provide enough gradient information to distinguish the lane from background in this scenario. Especially after gaussian blur. So I decided to switch to HSV space.
 
 * The intensity of the grayscale image and the V channel image were plotted along these three lines to show the difference.
-![Original](./report/Ori-111.jpg)
+![Original](./report/Ori111.jpg)
 * The following image shows that the grayscale cannot provide enough gradient information to detect the lane in this scenario.
 ![Grayscale](./report/G111.jpg)
 * The V channel of the image provide better gradient information to distinguish the lane from the background compared with the grayscale image.
