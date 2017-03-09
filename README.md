@@ -1,53 +1,136 @@
-#**Finding Lane Lines on the Road** 
-[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
+# **Finding Lane Lines on the Road** 
 
-<img src="laneLines_thirdPass.jpg" width="480" alt="Combined Image" />
+## Xinlin's report
 
-Overview
 ---
 
-When we drive, we use our eyes to decide where to go.  The lines on the road that show us where the lanes are act as our constant reference for where to steer the vehicle.  Naturally, one of the first things we would like to do in developing a self-driving car is to automatically detect lane lines using an algorithm.
+**Finding Lane Lines on the Road**
 
-In this project you will detect lane lines in images using Python and OpenCV.  OpenCV means "Open-Source Computer Vision", which is a package that has many useful tools for analyzing images.  
+The goals / steps of this project are the following:
+* Make a pipeline that finds lane lines on the road
+* Reflect on your work in a written report
 
-To complete the project, two files will be submitted: a file containing project code and a file containing a brief write up explaining your solution. We have included template files to be used both for the [code](https://github.com/udacity/CarND-LaneLines-P1/blob/master/P1.ipynb) and the [writeup](https://github.com/udacity/CarND-LaneLines-P1/blob/master/writeup_template.md).The code file is called P1.ipynb and the writeup template is writeup_template.md 
-
-To meet specifications in the project, take a look at the requirements in the [project rubric](https://review.udacity.com/#!/rubrics/322/view)
-
-
-Creating a Great Writeup
----
-For this project, a great writeup should provide a detailed response to the "Reflection" section of the [project rubric](https://review.udacity.com/#!/rubrics/322/view). There are three parts to the reflection:
-
-1. Describe the pipeline
-
-2. Identify any shortcomings
-
-3. Suggest possible improvements
-
-We encourage using images in your writeup to demonstrate how your pipeline works.  
-
-All that said, please be concise!  We're not looking for you to write a book here: just a brief description.
-
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup. Here is a link to a [writeup template file](https://github.com/udacity/CarND-LaneLines-P1/blob/master/writeup_template.md). 
-
-
-The Project
 ---
 
-## If you have already installed the [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) you should be good to go!   If not, you should install the starter kit to get started on this project. ##
+# Reflection
 
-**Step 1:** Set up the [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) if you haven't already.
+## 1. Describe your pipeline. As part of the description, explain how you modified the draw_lines() function.
 
-**Step 2:** Open the code in a Jupyter Notebook
+My pipeline consisted of 5 steps. 
 
-You will complete the project code in a Jupyter notebook.  If you are unfamiliar with Jupyter Notebooks, check out <A HREF="https://www.packtpub.com/books/content/basics-jupyter-notebook-and-python" target="_blank">Cyrille Rossant's Basics of Jupyter Notebook and Python</A> to get started.
+1. Convert the images from **RGB** space to **HSV** space, and use **V channel** instead of **grayscale** image.
 
-Jupyter is an Ipython notebook where you can run blocks of code and see results interactively.  All the code for this project is contained in a Jupyter notebook. To start Jupyter in your browser, use terminal to navigate to your project directory and then run the following command at the terminal prompt (be sure you've activated your Python 3 carnd-term1 environment as described in the [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) installation instructions!):
+  ```python
+  # Convert image color space to HSV space
+  HSV = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
-`> jupyter notebook`
+  H = HSV[:,:,0]
+  S = HSV[:,:,1]
+  V = HSV[:,:,2]
+  ```
 
-A browser window will appear showing the contents of the current directory.  Click on the file called "P1.ipynb".  Another browser window will appear displaying the notebook.  Follow the instructions in the notebook to complete the project.  
+  * Reason:
+  In my initial solution, I use grayscale image. However, it works very bad in the challenge part. I found that the grayscale image can not provide enough gradient information to distinguish the lane from background in this scenario. Especially after gaussian blur. So I decided to switch to HSV space.
 
-**Step 3:** Complete the project and submit both the Ipython notebook and the project writeup
+  * The intensity of the grayscale image and the V channel image were plotted along these three lines to show the difference.
+  ![Original](./report/Ori111.jpg)
+  * The following image shows that the grayscale cannot provide enough gradient information to detect the lane in this scenario.
+  ![Grayscale](./report/G111.jpg)
+  * The V channel of the image provide better gradient information to distinguish the lane from the background compared with the grayscale image.
+  ![V space](./report/V111.jpg)
 
+2. Gaussian blur the V channel image (**kernel size = 3**)
+  ```python
+  # Gaussian blur
+  gaussian = gaussian_blur(V, gaussian_kernel_size)
+  ```
+  * Reason:
+  Detecting the solid lanes are easier than detecting the broken lanes, thus my main focus is finding the threshold to distinguish the broken lane markings from the background. Gaussian blur is used to eliminate the high-frequency noise in the image, however, large Gaussian kernel size no only remove the noise but also blur the broken lane markings. 
+  
+  * I tested different Gaussian kernel size and picked the kernel size 3. It eliminate part of those unwanted high-frequency noise on the road while preserve the clearness of the broken lane markings
+  ![Gaussian](./report/gaussian-comp.jpg)
+
+3. Use Canny edge detector to extract the edges from the image (**low threshold = 90, high threshold = 150**)
+  ```python
+  # Canny edge detection
+  edges = canny(gaussian, canny_low_threshold, canny_high_threshold)
+  ```
+  * Reason: To determine the proper thresholds of the Canny edge detector, I draw all edges with different gradient thresholds. 
+  
+  * In the following examples, red edges (50 - 100), purple edges (100 - 150), white edges (> 150)
+  ![Canny1](./report/canny1.jpg)
+  ![Canny3](./report/canny3.jpg)
+  
+  * In the Canny edge detector, the edges satisfying high threshold are used as the seed to link those edges satisfying low threshold. Thus, the high threshold should be set to a relatively high value to eliminate noise while low enough to preserve capability that generate the edge seeds on the lane. The low threshold should be set to a high value to eliminate noise while still capable to capture the complete lane (Like the following scenario).
+  ![Canny2](./report/canny2.jpg)
+  
+4. Use a Region of Interest mask to remove non-relevent area 
+
+  ```python
+  # Define a convex polygon mask for the Region of Interest
+  imshape = image.shape
+    
+  left_bottom_point = [np.round(0.05 * imshape[1]).astype(int), np.round(0.95 * imshape[0]).astype(int)]
+  left_top_point = [np.round(0.46*imshape[1]).astype(int), np.round((0.63)*imshape[0]).astype(int)]
+  right_top_point = [np.round(0.54*imshape[1]).astype(int), np.round((0.63)*imshape[0]).astype(int)]
+  right_bottom_point = [np.round(0.95 * imshape[1]).astype(int), np.round(0.95 * imshape[0]).astype(int)]
+    
+  horizontal_shift = np.round(0.02 * imshape[1]).astype(int)
+  left_bottom_point[0] += horizontal_shift
+  left_top_point[0] += horizontal_shift
+  right_top_point[0] += horizontal_shift
+  right_bottom_point[0] += horizontal_shift
+    
+  vertical_shift = -1 * np.round(0.025 * imshape[0]).astype(int)
+  left_bottom_point[1] += vertical_shift
+  left_top_point[1] += vertical_shift
+  right_top_point[1] += vertical_shift
+  right_bottom_point[1] += vertical_shift    
+    
+  #Convert to tuple
+  left_bottom_point = tuple(left_bottom_point)
+  left_top_point = tuple(left_top_point)
+  right_top_point = tuple(right_top_point)
+  right_bottom_point = tuple(right_bottom_point)
+    
+  RoI_vertices = np.array([[left_bottom_point, left_top_point, right_top_point, right_bottom_point]], dtype=np.int32)
+  ```
+
+  ```python
+  # Region of Interest
+  RoI = region_of_interest(edges, RoI_vertices)
+  ```
+  * Reason: The geometry and position of the region of interest is highly dependent on the position of the camera.
+  ![RoI](./report/RoI.jpg)
+  
+5. Hough Line Transform, **low threshold = 90, high threshold = 150**
+  ```python
+  # Detect lines by using probabilistic Hough Line Transform   
+  lines = hough_lines(RoI, hough_rho, hough_theta, hough_threshold, hough_min_line_len, hough_max_line_gap)
+  ```
+  * Reason:
+
+ 
+  
+  
+
+In order to draw a single line on the left and right lanes, I modified the draw_lines() function by ...
+
+If you'd like to include images to show how the pipeline works, here is how to include an image: 
+
+![alt text][image1]
+
+
+### 2. Identify potential shortcomings with your current pipeline
+
+
+One potential shortcoming would be what would happen when ... 
+
+Another shortcoming could be ...
+
+
+### 3. Suggest possible improvements to your pipeline
+
+A possible improvement would be to ...
+
+Another potential improvement could be to ...
