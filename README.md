@@ -33,7 +33,7 @@ My pipeline consisted of 5 steps.
   In my initial solution, I use grayscale image. However, it works very bad in the challenge part. I found that the grayscale image can not provide enough gradient information to distinguish the lane from background in this scenario. Especially after gaussian blur. So I decided to switch to HSV space.
 
   * The intensity of the grayscale image and the V channel image were plotted along these three lines to show the difference.
-  ![Original](./report/Ori111.jpg)
+  ![Original](./report/Ori111.JPG)
   * The following image shows that the grayscale cannot provide enough gradient information to detect the lane in this scenario.
   ![Grayscale](./report/G111.jpg)
   * The V channel of the image provide better gradient information to distinguish the lane from the background compared with the grayscale image.
@@ -101,7 +101,7 @@ My pipeline consisted of 5 steps.
   RoI = region_of_interest(edges, RoI_vertices)
   ```
   * Reason: The geometry and position of the region of interest is highly dependent on the position of the camera.
-  ![RoI](./report/RoI.jpg)
+  ![RoI](./report/RoI.JPG)
   
 5. Hough Line Transform, **low threshold = 90, high threshold = 150**
   ```python
