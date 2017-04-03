@@ -246,6 +246,7 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
   * Reason: If use only one single Hough transform, the broken lane markings could be flooded by background noise on the road, since both of them are short line segments. Compared with the background noise, the line segments belonging to the broken lane marking have strong direction consistency along the broken lane markings. Therefore, the broken lane markings can be distinguished from the background noise by using another Hough transform.
   
     * Left and Right lane segments from previous step.
+	
     ![filter-distribute-2](./report/filter-and-distribute-2.png)
   
     ```python
@@ -319,7 +320,7 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
     x_tops = x_tops[mask, :]
     ```
   
-  * The line segments can also be filtered by their slopes.
+  * The line segments of broken lane marking also form a dense region of their slope thus they can also be filtered by their slopes.
     ```python
     # filter by slope (x_tops[:, 2] are slopes)
     n = np.ceil(x_bots.shape[0] * 0.5).astype(int)
@@ -328,28 +329,27 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
     x_bots = x_bots[mask, :]
     x_tops = x_tops[mask, :]
     ```
+
+  * The standard deviation of the x coordinates and the slopes of the line segments can be used as a quality measurement of the lane detection. The smaller the standard deviation, the better the lane detection quality.
   
 5. Compute length-weighted x_top and x_bottom as the prediction of lane.
-  ```python
+    ```python
     if x_bots.size != 0:
 		# x_bots[:, 0] are extrapolated x coordinates, x_bots[:, 1] are the length of corresponding line segments.
         x_bot = np.round(np.average(x_bots[:, 0], weights=x_bots[:, 1])).astype(int)
         x_top = np.round(np.average(x_tops[:, 0], weights=x_tops[:, 1])).astype(int)
 
         lane = [x_bot, y_bot, x_top, y_top]
-  ```
+    ```
 
+### Conclusion
+The pipeline provide a good lane detection result in the complex scenarios (The region of interest was enlarged to cover tree shadows, cars, adjacent lanes). 
+  ![final](./report/final.jpg)
 
-### 2. Identify potential shortcomings with your current pipeline
+## 2. Identify potential shortcomings with your current pipeline
 
+Due to the "Remove semi-vertical and semi-horizontal line segments" step, the lane detection might fail if the lane is vertical. This situation could happen when the vehicle switching lanes.
 
-One potential shortcoming would be what would happen when ... 
+## 3. Suggest possible improvements to your pipeline
 
-Another shortcoming could be ...
-
-
-### 3. Suggest possible improvements to your pipeline
-
-A possible improvement would be to ...
-
-Another potential improvement could be to ...
+* The lane detection of the current pipeline is based on one single frame. A time-averaged step could be introduced to make the lane detection process smoother and more robust. One potential solution is recording the lane predictions from the previous 5 or 10 frames. Use the "median" lane from previous frames to avoid the failure of lane detection in one single frame.
