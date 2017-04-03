@@ -16,7 +16,7 @@ The goals / steps of this project are the following:
 
 ## 1. Describe your pipeline. As part of the description, explain how you modified the draw_lines() function.
 
-My pipeline consisted of 7 steps. 
+### The pipeline described in this report consisted of *5 basic steps* and *5 extra steps*. The basic steps are very smilar with the standard lane detection pipeline of project 1. To conquer the challenge.mp4, I modified the draw_lines() function and added 5 extra steps in it.
 
 1. Convert the images from **RGB** space to **HSV** space, and use **V channel** instead of **grayscale** image.
 
@@ -108,7 +108,7 @@ My pipeline consisted of 7 steps.
   ```
   ![RoI](./report/RoI.JPG)
   
-5. Use Hough line transform to detect the line segments from the images, **rho = 2, theta = np.pi/180, threshold = 40, min line len = 10, max line gap = 10**
+5. Use Hough line transform to detect the line segments from the images, **rho = 2, theta = np.pi/180, threshold = 35, min line len = 5, max line gap = 10**
   ```python
   # Detect lines by using probabilistic Hough Line Transform   
   lines = hough_lines(RoI, hough_rho, hough_theta, hough_threshold, hough_min_line_len, hough_max_line_gap)
@@ -117,26 +117,82 @@ My pipeline consisted of 7 steps.
 
   * The Hough line transform provide good results when testing with the test images.
   ![Hough-Comp](./report/Hough-Comp.jpg)
-  
-6. Filter background line segments and decide which lane the segments belongs to.
-  * Reason: For simple scenarios, the previous 5 steps are good enough to detect the lanes. However, in complex scenarios (like tree shadow or damaged road), lots of errors can be observed. 
-  ![Hough-extra](./report/Hough-extra.jpg)
-  
-  * To filter these unwanted line segments, I set a criteria that remove all semi-vertical and semi-horizontal line segments (angle less than 20 degrees). 
-  
-  * Then distinguish the line segments belongs to left lane or right lane by positive or negative slope.
+
+---
+### For simple scenarios, the previous five steps can do the job. However, in complex scenarios (like tree shadow or damaged road), lots of errors can be observed. If use more strict parameters, the broken lane markings can not be distinguished from the road background. Therefore, five extra steps have been added to the draw_lines() function for obtain better result.
+![Hough-extra](./report/Hough-extra.jpg)
+
+1. Remove semi-vertical and semi-horizontal line segments
+
+2. Seperate line segments of the left lanes and the right lanes
+3. Use another Hough transform on the left and right lane segments to suppress the noise and intensify the lane marking.
+4. Filter the line segments by detecting the dense slope interval and dense x coordinates interval.
+5. Compute length-weighted x_top and x_bottom as the prediction of lane.
+
+```python
+def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
+
+    # 1. Remove semi-vertical and semi-horizontal line segments
+    lines = remove_vertical_and_horizontal_lines(lines, img, vertical_angle=15,
+                                                 horizontal_angle=35)
+												 
+    # 2. Seperate left and right lane segments
+    left_lane_segments, right_lane_segments = seperate_left_and_right_lanes(lines, img)
+    
+    # Parameters for the second Hough transform
+    hough_rho = 8
+    hough_theta = np.pi / 90
+    hough_threshold = 350
+    hough_min_line_len = 30
+    hough_max_line_gap = 150
+    
+	# 3. Use second Hough transform on the left and right lane segments to extract the lanes.
+    left_lane_segments = second_hough_transform(left_lane_segments, img,
+                                                thickness=10, color=(255, 255, 255),
+                                                hough_rho=hough_rho, hough_theta=hough_theta, 
+                                                hough_threshold=hough_threshold, hough_min_line_len=hough_min_line_len,
+                                                hough_max_line_gap=hough_max_line_gap)
+    
+    right_lane_segments = second_hough_transform(right_lane_segments, img,
+                                                thickness=10, color=(255, 255, 255),
+                                                hough_rho=hough_rho, hough_theta=hough_theta, 
+                                                hough_threshold=hough_threshold, hough_min_line_len=hough_min_line_len,
+                                                hough_max_line_gap=hough_max_line_gap)
+												
+    # y_bot, y_top for extrapolate line segments
+    y_bot = np.round(img.shape[0] * 0.95).astype(int)
+    y_top = np.round(img.shape[0] * 0.6).astype(int)
+
+	# Detect lanes from line segments
+    if left_lane_segments is not None :
+        left_lane = detect_lane_from_segments(img, left_lane_segments, y_bot=y_bot, y_top=y_top)
+    
+    if right_lane_segments is not None :
+        right_lane = detect_lane_from_segments(img, right_lane_segments, y_bot=y_bot, y_top=y_top)
+    
+    # Draw lanes
+    if left_lane != None:
+        cv2.line(img, (left_lane[0], left_lane[1]), (left_lane[2], left_lane[3]), color, thickness)
+        pass
+    if right_lane != None:
+        cv2.line(img, (right_lane[0], right_lane[1]), (right_lane[2], right_lane[3]), color, thickness)
+        pass
+```
+
+1. Remove semi-vertical and semi-horizontal line segments 
+  * Reason: To filter these unwanted line segments, I set a criteria that remove all semi-vertical and semi-horizontal line segments (angle less than 20 degrees). 
   
   ```python
-	def filter_and_distribute(lines, img):   
-		# Criteria for vertical and horizontal lines
-		RAD_TOL = 20 / 180 * np.pi
+	def remove_vertical_and_horizontal_lines(lines, img, angle=20):
+		"""
+		Remove the vertical and horizontal line segments
+		"""
+		
+		RAD_TOL = angle / 180 * np.pi
 		TOL = np.sin(RAD_TOL)
 		
-		img_x_mid = img.shape[1] / 2
+		result = []
 		
-		left_lane_segments = []
-		right_lane_segments = []
-
 		for line in lines:
 			for x1,y1,x2,y2 in line:         
 				length = np.sqrt((x2-x1)**2 + (y2-y1)**2)
@@ -145,41 +201,144 @@ My pipeline consisted of 7 steps.
 				if (np.abs(x2 - x1) / length < TOL) or (np.abs(y2 - y1) / length < TOL):
 					continue               
 				
-				slope = (y2 - y1) / (x2 - x1)
+				result.append([[x1, y1, x2, y2]])
 
+		return result
+  ```
+  
+2. Seperate line segments of the left lane and the right lane
+  * Seperate the line segments by their mid point x coordinates and slope.
+  
+  ```python
+	def seperate_left_and_right_lanes(lines, img):
+		"""
+		Seperate the left lane segments and right lane segments
+		"""
+		img_x_mid = img.shape[1] / 2
+		
+		left_lane_segments = []
+		right_lane_segments = []
+
+		for line in lines:
+			for x1,y1,x2,y2 in line:            
+				slope = (y2 - y1) / (x2 - x1)
 				x_mid = (x1 + x2) / 2
 				
-				# Distinguish the line belongs to left lane or right lane
+				# Seperate the line belongs to left lane or right lane
 				# Negative slope and on the left side => left lane
 				if slope < 0 and x_mid < img_x_mid:
 					left_lane_segments.append([[x1, y1, x2, y2]])
-					cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+					#cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
 				# Positive slope and on the right side => right lane
 				elif slope > 0 and x_mid > img_x_mid:       
 					right_lane_segments.append([[x1, y1, x2, y2]])
-					cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+					#cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
 				else:
 					pass
 
 		return left_lane_segments, right_lane_segments
   ```
   
-  * The following image is the result of filter and distribute step. the left lane segments are drawed in green and the right lane segments are drawed in purple.
+  * The following image is the result after first two extra steps. the left lane segments are drawed in green and the right lane segments are drawed in purple.
   ![filter-distribute](./report/filter-and-distribute.jpg)
   
-7. Draw the left and right lane segments separately, and use Hough Line Transform again to detect the left and right lanes.
+3. Use another Hough transform on the left and right lane segments to suppress the noise and intensify the broken lane marking.
+  * Reason: If use only one single Hough transform, the broken lane markings could be flooded by background noise on the road, since both of them are short line segments. Compared with the background noise, the line segments belonging to the broken lane marking have strong direction consistency along the broken lane markings. Therefore, the broken lane markings can be distinguished from the background noise by using another Hough transform.
+  
+    * Left and Right lane segments from previous step.
+    ![filter-distribute-2](./report/filter-and-distribute-2.png)
+  
+    ```python
+	def second_hough_transform(lane_segments,
+                           img,
+                           draw_thickness = 10,
+                           draw_color = (255,255,255),
+                           hough_rho = 8,
+                           hough_theta = np.pi / 90,
+                           hough_threshold = 350,
+                           hough_min_line_len = 30,
+                           hough_max_line_gap = 150):
+    
+    # Draw left lane and right lane segments on empty images
+    lane_image = draw_line_segments(lane_segments, img, thickness=draw_thickness, color=draw_color)
+    
+    # Use another Hough transform 
+    lane_image = grayscale(lane_image)
+    second_lane_segments = cv2.HoughLinesP(lane_image, hough_rho, 
+                                           hough_theta, hough_threshold, 
+                                           np.array([]), hough_min_line_len, 
+                                           hough_max_line_gap)
+    
+    return second_lane_segments
+	```
+  
+  * #1 The lane segments are drawed on an empty image (**thickness = 10**), the thickness set to a high value so the adjacent lines are merged.
+
+    ```python
+	def draw_line_segments(segments, img, color=(255, 255, 255), thickness = 10):
+	    """
+		Draw all line segments on an empty image and return it.
+		"""
+		# if segments is empty
+		if segments is None:
+			return None
+		
+		# Create empty image
+		result = np.zeros_like(img)
+		
+		for line in segments:
+			for x1,y1,x2,y2 in line:
+				cv2.line(result, (x1, y1), (x2, y2), color, thickness)
+
+		return result
+    ```
+	
+    * The left lane image and the right lane image.
+    ![2hough-1](./report/2hough-1.jpg)
+  * #2 Use another Hough transform on the lane image (**hough_rho = 8, hough_theta = np.pi/90, hough_threshold = 350, hough_min_line_len = 30, hough_max_line_gap = 150**). hough_rho and hough_theta set to high values that allow the adjacent line segments vote for the same line. The hough_threshold also set to a very high value thus only those line segments have strong direction consistency can pass the threshold and considered as a line.
+    * Use Hough transform on the lane images to extract the lanes.
+    ![2hough-2](./report/2hough-2.jpg)
+
+4. Filter the line segments by detecting the dense intervals of the slope and x coordinates.
+  * Reason: Extrapolate all line segments to y_top and y_bottom, the x_top and x_bottom of line segments belonging to broken lane marking form an dense region. The line segments can be filtered by removing line segments not in the dense region.
+  ![2hough-extra](./report/2hough-extrapolate.jpg)
+    ```python
+	
+	# Extrapolate line segments to y_top and y_bot. Compute length and slope for each line segments
+	x_bots, x_tops = extrapolate_lines(lane_segments, img, y_bot=y_bot, y_top=y_top)
+
+    x_bots = np.array(x_bots)
+    x_tops = np.array(x_tops)
+	
+    # Filter by x_top coordinates
+	# Find minimum interval covering 70% of line segments
+    n = np.ceil(x_bots.shape[0] * 0.7).astype(int)
+    x_top_low, x_top_high = find_min_interval_of_n_elements_in_a_sorted_array(x_tops[:, 0], n)
+    mask = np.logical_and(x_tops[:, 0] >= x_top_low, x_tops[:, 0] <= x_top_high)
+    x_bots = x_bots[mask, :]
+    x_tops = x_tops[mask, :]
+    ```
+  
+  * The line segments can also be filtered by their slopes.
+    ```python
+    # filter by slope (x_tops[:, 2] are slopes)
+    n = np.ceil(x_bots.shape[0] * 0.5).astype(int)
+    x_top_slope_low, x_top_slope_high = find_min_interval_of_n_elements_in_a_sorted_array(x_tops[:, 2], n)
+    mask = np.logical_and(x_tops[:, 2] >= x_top_slope_low, x_tops[:, 2] <= x_top_slope_high)
+    x_bots = x_bots[mask, :]
+    x_tops = x_tops[mask, :]
+    ```
+  
+5. Compute length-weighted x_top and x_bottom as the prediction of lane.
   ```python
-  # Detect lines by using probabilistic Hough Line Transform   
-  lines = hough_lines(RoI, hough_rho, hough_theta, hough_threshold, hough_min_line_len, hough_max_line_gap)
+    if x_bots.size != 0:
+		# x_bots[:, 0] are extrapolated x coordinates, x_bots[:, 1] are the length of corresponding line segments.
+        x_bot = np.round(np.average(x_bots[:, 0], weights=x_bots[:, 1])).astype(int)
+        x_top = np.round(np.average(x_tops[:, 0], weights=x_tops[:, 1])).astype(int)
+
+        lane = [x_bot, y_bot, x_top, y_top]
   ```
 
-  ![filter-distribute-2](./report/filter-and-distribute-2.png)
-  * Draw the left and right lane separately. Use large thickness increase the tolerance 
-  ![2hough-1](./report/2hough-1.jpg)
-  * Use Hough Transform again to extract the lane.
-  ![2hough-2](./report/2hough-2.jpg)
-  
-8. Extrapolate the line segments from second hough transform
 
 ### 2. Identify potential shortcomings with your current pipeline
 
