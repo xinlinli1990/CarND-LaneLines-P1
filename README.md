@@ -146,7 +146,7 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
     hough_min_line_len = 30
     hough_max_line_gap = 150
     
-	# 3. Use second Hough transform on the left and right lane segments to extract the lanes.
+    # 3. Use second Hough transform on the left and right lane segments to extract the lanes.
     left_lane_segments = second_hough_transform(left_lane_segments, img,
                                                 thickness=10, color=(255, 255, 255),
                                                 hough_rho=hough_rho, hough_theta=hough_theta, 
@@ -163,16 +163,18 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
     y_bot = np.round(img.shape[0] * 0.95).astype(int)
     y_top = np.round(img.shape[0] * 0.6).astype(int)
 
-	# Detect lanes from line segments
+	# 4. Filter the line segments by detecting the dense slope interval and dense x coordinates interval.
+    # 5. Compute length-weighted x_top and x_bottom as the lane of current frame.
     if left_lane_segments is not None :
         left_lane = detect_lane_from_segments(img, left_lane_segments, y_bot=y_bot, y_top=y_top)
-		
-	left_lane = get_time_averaged_lane(left_lane, left_lanes)
+
+    # 6. Time-averaged step.
+    left_lane = get_time_averaged_lane(left_lane, left_lanes)
     
     if right_lane_segments is not None :
         right_lane = detect_lane_from_segments(img, right_lane_segments, y_bot=y_bot, y_top=y_top)
 
-	right_lane = get_time_averaged_lane(right_lane, right_lanes)
+    right_lane = get_time_averaged_lane(right_lane, right_lanes)
     
     # Draw lanes
     if left_lane != None:
