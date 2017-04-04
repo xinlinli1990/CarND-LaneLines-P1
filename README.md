@@ -119,15 +119,15 @@ The goals / steps of this project are the following:
   ![Hough-Comp](./report/Hough-Comp.jpg)
 
 ---
-### For simple scenarios, the previous five steps can do the job. However, in complex scenarios (like tree shadow or damaged road), lots of errors can be observed. If use more strict parameters, the broken lane markings can not be distinguished from the road background. Therefore, five extra steps have been added to the draw_lines() function for obtain better result.
+### For simple scenarios, the previous five steps can do the job. However, in complex scenarios (like tree shadow or damaged road), lots of errors can be observed. If use more strict parameters, the broken lane markings can not be distinguished from the road background. Therefore, six extra steps have been added to the draw_lines() function for obtain better result.
 ![Hough-extra](./report/Hough-extra.jpg)
 
 1. Remove semi-vertical and semi-horizontal line segments
-
 2. Seperate line segments of the left lanes and the right lanes
 3. Use another Hough transform on the left and right lane segments to suppress the noise and intensify the lane marking.
 4. Filter the line segments by detecting the dense slope interval and dense x coordinates interval.
-5. Compute length-weighted x_top and x_bottom as the prediction of lane.
+5. Compute length-weighted x_top and x_bottom as the lane of current frame.
+6. Time-averaged step. Keep 5 most recent lanes detected by the pipeline, Correct the lane of current frame with previous lanes.
 
 ```python
 def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
@@ -166,9 +166,13 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
 	# Detect lanes from line segments
     if left_lane_segments is not None :
         left_lane = detect_lane_from_segments(img, left_lane_segments, y_bot=y_bot, y_top=y_top)
+		
+	left_lane = get_time_averaged_lane(left_lane, left_lanes)
     
     if right_lane_segments is not None :
         right_lane = detect_lane_from_segments(img, right_lane_segments, y_bot=y_bot, y_top=y_top)
+
+	right_lane = get_time_averaged_lane(right_lane, right_lanes)
     
     # Draw lanes
     if left_lane != None:
@@ -342,14 +346,52 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=10):
         lane = [x_bot, y_bot, x_top, y_top]
     ```
 
+6. Time-averaged step. Keep 5 most recent lanes detected by the pipeline, Correct the lane of current frame with previous lanes.
+  * Reason: The lane detection on one single image could be failed or not accurate. To improve the robustness, the lane detection pipeline keep 5 most recent results and output the median value of these results. Thus occasional failure of detection will not affect the final output result of the pipeline.
+  
+	```python
+	def get_time_averaged_lane(new_lane, lanes):
+		
+		if len(lanes) == 0 and new_lane is None:
+			return None
+		
+		# keep 5 most recent lanes
+		lanes_size = 5
+		
+		if new_lane is not None:   
+			lanes.append(new_lane)
+			
+		while len(lanes) > lanes_size:
+			lanes.pop(0)
+			
+		return get_lane_from_lanes(lanes)
+		
+	def get_lane_from_lanes(lanes):
+    
+		# 1. Get median lane sorted by x_top and x_bot
+		# [x_bot, y_bot, x_top, y_top], sort by x_bot
+		sorted_lanes_bot = sorted(lanes, key=lambda lane : lane[0])
+		# sort by x_top
+		sorted_lanes_top = sorted(lanes, key=lambda lane : lane[2])
+		half_bot = len(sorted_lanes_bot) // 2
+		half_top = len(sorted_lanes_top) // 2
+		lane_bot = sorted_lanes_bot[half_bot]
+		lane_top = sorted_lanes_top[half_top]
+
+		# 2. Return the averaged lane of the top and bottom median lane
+		result_x_bot = np.round((lane_bot[0] + lane_top[0]) / 2).astype(int)
+		result_x_top = np.round((lane_bot[2] + lane_top[2]) / 2).astype(int)
+		return [result_x_bot, lane_bot[1], result_x_top, lane_bot[3]]
+    ```
+
 ### Conclusion
-The pipeline provide a good lane detection result in the complex scenarios (The region of interest was enlarged to cover tree shadows, cars, adjacent lanes). 
+The pipeline provide a good lane detection result in the complex scenarios. (The region of interest was enlarged to cover tree shadows, cars, adjacent lanes). 
   ![final](./report/final.jpg)
 
 ## 2. Identify potential shortcomings with your current pipeline
 
-Due to the "Remove semi-vertical and semi-horizontal line segments" step, the lane detection might fail if the lane is vertical. This situation could happen when the vehicle switching lanes.
+* Due to the "Remove semi-vertical and semi-horizontal line segments" step, the lane detection might fail if the lane is vertical. This situation could happen when the vehicle switching lanes.
 
 ## 3. Suggest possible improvements to your pipeline
 
-* The lane detection of the current pipeline is based on one single frame. A time-averaged step could be introduced to make the lane detection process smoother and more robust. One potential solution is recording the lane predictions from the previous 5 or 10 frames. Use the "median" lane from previous frames to avoid the failure of lane detection in one single frame.
+* Try to remove the "Remove semi-vertical and semi-horizontal line segments" step from the pipeline to avoid the potential shortcomings.
