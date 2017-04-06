@@ -2,15 +2,12 @@
 
 ## Xinlin's report
 
----
+[![Challenge](./report/video_challenge.JPG)](https://www.youtube.com/watch?v=g8WaWTVDtKQ)
 
-**Finding Lane Lines on the Road**
+[![Result1](https://img.youtube.com/vi/d_YbdFPREDg/0.jpg)](https://www.youtube.com/watch?v=d_YbdFPREDg)
 
-The goals / steps of this project are the following:
-* Make a pipeline that finds lane lines on the road
-* Reflect on your work in a written report
+[![Result2](https://img.youtube.com/vi/Fq9H5FJGyWk/0.jpg)](https://www.youtube.com/watch?v=Fq9H5FJGyWk)
 
----
 
 # Reflection
 
