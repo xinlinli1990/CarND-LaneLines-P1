@@ -13,7 +13,7 @@
 
 ## 1. Describe your pipeline. As part of the description, explain how you modified the draw_lines() function.
 
-### The pipeline described in this report consisted of *5 basic steps* and *5 extra steps*. The basic steps are very smilar with the standard lane detection pipeline of project 1. To conquer the challenge.mp4, I modified the draw_lines() function and added 5 extra steps in it.
+### The pipeline described in this report consisted of *5 basic steps* and *5 extra steps*. The basic steps are very smilar to the standard lane detection pipeline. To conquer the challenge.mp4, I modified the draw_lines() function and added 5 extra steps in it.
 
 1. Convert the images from **RGB** space to **HSV** space, and use **V channel** instead of **grayscale** image.
 
